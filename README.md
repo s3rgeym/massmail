@@ -7,12 +7,19 @@ Features:
 - Send bulk of emails.
 - Randomize text of subject and message for each email.
 - Attach files.
+- Parallel processing.
 
 Install:
 
 ```bash
 # I recommend to use pipx instead
 $ pip install massmail
+```
+
+Usage:
+
+```bash
+$ massmail --help
 ```
 
 Example:
