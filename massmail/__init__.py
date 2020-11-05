@@ -2,6 +2,8 @@
 import logging
 import multiprocessing
 import os
+import random
+import re
 import smtplib
 from email import encoders
 from email.mime.base import MIMEBase
@@ -15,7 +17,7 @@ import click
 __author__ = 'Sergey M'
 __email__ = 'tz4678@gmail.com'
 __license__ = 'MIT'
-__version__ = '0.1.0'
+__version__ = '0.1.1'
 
 
 @click.command()
@@ -26,7 +28,6 @@ __version__ = '0.1.0'
 @click.option('--port', default=25, help="Port", show_default=True, type=int)
 @click.option(
     '--ssl/--no-ssl',
-    'use_ssl',
     default=False,
     help="use SSL",
     is_flag=True,
@@ -74,7 +75,7 @@ def massmail(
     password: Union[None, str],
     host: Union[None, str],
     port: int,
-    use_ssl: bool,
+    ssl: bool,
     message: str,
     subject: str,
     as_html: bool,
@@ -94,10 +95,11 @@ def massmail(
     levels = [logging.WARNING, logging.INFO, logging.DEBUG]
     level = levels[min(verbosity, len(levels) - 1)]
     logger = multiprocessing.log_to_stderr(level)
-    logger.info("start mailing")
     email_queue = multiprocessing.Queue()
     for email in emails:
         email_queue.put(email)
+    workers_num = min(workers_num, len(emails))
+    logger.info("start mailing")
     workers = [
         Worker(
             email_queue,
@@ -105,7 +107,7 @@ def massmail(
             password,
             host,
             port,
-            use_ssl,
+            ssl,
             message,
             subject,
             as_html,
@@ -126,7 +128,7 @@ class Worker(multiprocessing.Process):
         password: str,
         host: str,
         port: int,
-        use_ssl: bool,
+        ssl: bool,
         message: str,
         subject: str,
         as_html: bool,
@@ -138,7 +140,7 @@ class Worker(multiprocessing.Process):
         self.password = password
         self.host = host
         self.port = port
-        self.use_ssl = use_ssl
+        self.ssl = ssl
         self.message = message
         self.as_html = as_html
         self.subject = subject
@@ -146,38 +148,61 @@ class Worker(multiprocessing.Process):
         self.logger = multiprocessing.get_logger()
         self.start()
 
-    def connect(self) -> None:
-        if hasattr(self, 'smtp'):
-            return
-        if self.use_ssl:
+    def connect_smtp(self) -> None:
+        if self.ssl:
             self.smtp = smtplib.SMTP_SSL(self.host, self.port)
         else:
             self.smtp = smtplib.SMTP(self.host, self.port)
         self.smtp.login(self.username, self.password)
 
     def run(self) -> None:
+        self.connect_smtp()
         while self.email_queue.qsize() > 0:
             email = self.email_queue.get()
             try:
                 msg = MIMEMultipart()
                 msg['From'] = self.username
                 msg['To'] = email
-                msg['Subject'] = self.subject
+                msg['Subject'] = randomize(self.subject)
                 msg.attach(
-                    MIMEText(self.message, 'html' if self.as_html else 'plain')
+                    MIMEText(
+                        randomize(self.message),
+                        'html' if self.as_html else 'plain',
+                    )
                 )
                 for attachment in self.attachments:
                     part = MIMEBase('application', 'octeat-stream')
                     attachment.seek(0)
                     part.set_payload(attachment.read())
                     encoders.encode_base64(part)
+                    filename = os.path.basename(attachment.name)
+                    # На rambler.ru не работает
+                    # https://tools.ietf.org/html/rfc6266#section-5
+                    # part.add_header(
+                    #     'Content-Disposition',
+                    #     f"attachment; filename*=UTF-8''{urllib.parse.quote(filename)}",
+                    # )
                     part.add_header(
                         'Content-Disposition',
-                        # не смог я нагуглить как закодировать имя, содержащее двойные кавычки
-                        f'attachment; filename="{os.path.basename(attachment.name)}"',
+                        f'attachment; filename="{filename}"',
                     )
                     msg.attach(part)
-                self.connect()
                 self.smtp.sendmail(self.username, email, msg.as_string())
             except Exception as e:
                 self.logger.error(e)
+
+
+def randomize(s: str) -> str:
+    """Randomize text.
+
+    >>> randomize('{Привет|Здравствуй}, {как {жизнь|дела}|что нового}?')
+    'Привет, как жизнь?'
+    """
+    while 1:
+        temp = re.sub(
+            r'{([^{}]*)}', lambda m: random.choice(m.group(1).split('|')), s
+        )
+        if s == temp:
+            break
+        s = temp
+    return s
