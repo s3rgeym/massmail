@@ -2,14 +2,21 @@
 
 Mass mailing via SMTP.
 
+Features:
+
+- Send bulk of emails.
+- Randomize text of subject and message for each email.
+- Attach files.
+
 Install:
 
 ```bash
-$ pipx install massmail
+# I recommend to use pipx instead
+$ pip install massmail
 ```
 
 Example:
 
 ```bash
-zcnbvm@proton.me --host smtp.gmail.com --ssl --port 465 --subject "Special Offer" --attach offer.pdf emails.txt
+zcnbvm@proton.me --host smtp.gmail.com --ssl --port 465 --message "{Привет|Здравствуй}, {как {жизнь|дела}|что нового}?" emails.txt
 ```
