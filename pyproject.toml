@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "massmail"
-version = "0.1.1"
+version = "0.1.2"
 description = "Mass Mailing via SMTP"
 authors = ["Sergey M <tz4678@gmail.com>"]
 homepage = "https://github.com/tz4678/massmail"
