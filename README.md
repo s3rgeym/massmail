@@ -5,9 +5,9 @@ Mass mailing via SMTP.
 Features:
 
 - Send bulk of emails.
+- Parallel processing.
 - Randomize text of subject and message for each email.
 - Attach files.
-- Parallel processing.
 
 Install:
 
