@@ -189,7 +189,7 @@ class Worker(multiprocessing.Process):
         self.start()
 
     @property
-    def connection(self) -> None:
+    def connection(self) -> Union[smtplib.SMTP, smtplib.SMTP_SSL]:
         return smtplib.SMTP_SSL if self.ssl else smtplib.SMTP
 
     def login(self) -> None:
