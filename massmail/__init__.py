@@ -18,7 +18,7 @@ import click
 __author__ = 'Sergey M'
 __email__ = 'tz4678@gmail.com'
 __license__ = 'MIT'
-__version__ = '0.1.2'
+__version__ = '0.1.3'
 
 
 @click.command()
@@ -192,7 +192,7 @@ class Worker(multiprocessing.Process):
     def connection(self) -> Union[smtplib.SMTP, smtplib.SMTP_SSL]:
         return smtplib.SMTP_SSL if self.ssl else smtplib.SMTP
 
-    def login(self) -> None:
+    def connect(self) -> None:
         self.smtp = self.connection(self.host, self.port)
         if self.ssl and self.starttls:
             self.smtp.ehlo()
@@ -201,6 +201,9 @@ class Worker(multiprocessing.Process):
         self.smtp.login(self.username, self.password)
 
     def send(self, to: str) -> None:
+        # сессия SMTP живет всего пару минут, поэтому перед каждой отправкой
+        # подключаемся по новой
+        self.connect()
         message = MIMEMultipart()
         message['From'] = make_address(self.username, self.sender_name)
         message['To'] = to
@@ -233,22 +236,25 @@ class Worker(multiprocessing.Process):
             )
             message.attach(part)
         self.smtp.sendmail(self.username, to, message.as_string())
+        self.smtp.quit()
 
     def run(self) -> None:
-        self.login()
         while self.email_queue.qsize() > 0:
             email = self.email_queue.get()
             try:
                 self.send(email)
-            except Exception as e:
-                self.logger.fatal(e)
+                self.logger.debug(f"mail has sent to {email!r}")
+            except smtplib.SMTPAuthenticationError:
+                self.logger.fatal("invalid credentials")
                 raise
+            except Exception as e:
+                self.logger.error(e)
 
 
 def randomize(s: str) -> str:
     """Randomize text.
 
-    >>> randomize('{Привет|Здравствуй}, {как {жизнь|дела}|что нового}?')
+    >>> randomize("{Привет|Здравствуй}, {как {жизнь|дела}|что нового}?")
     'Привет, как жизнь?'
     """
     while 1:
