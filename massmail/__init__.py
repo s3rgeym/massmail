@@ -11,7 +11,7 @@ from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr
-from typing import BinaryIO, TextIO, Tuple, Union
+from typing import BinaryIO, TextIO, Tuple, Union, Optional
 
 import click
 
@@ -20,7 +20,7 @@ __email__ = 'yamldeveloper@proton.me'
 __license__ = 'MIT'
 __version__ = '0.1.3'
 
-
+# TODO: use dataclassese
 @click.command()
 @click.version_option(__version__)
 @click.option('-H', '--host', help="Host", required=True)
@@ -122,7 +122,7 @@ def massmail(
     logger = multiprocessing.log_to_stderr(level)
     email_queue = multiprocessing.Queue()
     for email in emails:
-        email_queue.put(email)
+        email_queue.put_nowait(email)
     workers_num = min(workers_num, len(emails))
     logger.info("start mailing")
     workers = [
@@ -258,16 +258,15 @@ def randomize(s: str) -> str:
     'Привет, как жизнь?'
     """
     while 1:
-        temp = re.sub(
-            r'{([^{}]*)}', lambda m: random.choice(m.group(1).split('|')), s
+        s1 = re.sub(
+            r'{([^{}]*)}', lambda m: random.choice(m.group(1).split('|')),
+            s,
         )
-        if s == temp:
+        if s == s1:
             break
-        s = temp
+        s = s1
     return s
 
-
-def make_address(email: str, name: Union[None, str]) -> str:
-    if name:
-        return formataddr((name, email))
-    return email
+ 
+def make_address(email: str, name: Optional[str] = None) -> str:
+    return formataddr((name, email)) if name else email
